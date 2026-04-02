@@ -1,0 +1,92 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: ../../docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../apps/api/.env
+    depends_on:
+      - postgres
+      - redis
+      - chroma
+    volumes:
+      - api_data:/app/data
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../apps/api
+      dockerfile: ../../docker/Dockerfile.api
+    command: celery -A aria_api.workers.knowledge.celery_app worker --loglevel=info --concurrency=4
+    env_file:
+      - ../apps/api/.env
+    depends_on:
+      - postgres
+      - redis
+      - chroma
+    volumes:
+      - api_data:/app/data
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aria
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: aria
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      CHROMA_SERVER_HOST: 0.0.0.0
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: ../../docker/Dockerfile.next
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ../apps/dashboard
+      dockerfile: ../../docker/Dockerfile.next
+    ports:
+      - "3001:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      NEXT_PUBLIC_API_URL: http://api:8000
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  chroma_data:
+  api_data:

@@ -1,0 +1,67 @@
+# Aria — Ops Coordinator AI Employee Template
+# AgentTeam: parallel mode
+# Stage 1a: Request Classifier (parallel with KB lookup)
+# Stage 2: Task Executor
+# Stage 3: Follow-up Scheduler
+
+name: "{employee_name}"
+process: parallel
+verbose: false
+
+agents:
+  - name: Request Classifier
+    role: Request Triage Specialist
+    goal: >
+      Classify the incoming request by type and urgency, and determine
+      what action or information is needed to fulfill it.
+    backstory: >
+      You are a precise operations analyst. You categorize requests into:
+      scheduling, reporting, data entry, status update, escalation needed.
+    llm: gpt-4o-mini
+    max_iter: 1
+
+  - name: Task Executor
+    role: Operations Coordinator
+    goal: >
+      Execute the required operational task based on the classified request.
+    backstory: >
+      You are {employee_name}, an organized and efficient operations coordinator
+      for {company_name}.
+      {persona_prompt}
+      You complete tasks accurately, confirm actions taken, and flag anything
+      that requires human approval.
+    llm: "{llm_model}"
+    tools:
+      - calendar_tool
+      - email_tool
+      - knowledge_base_search
+    context_from: [Request Classifier]
+    max_iter: 3
+
+  - name: Follow-up Scheduler
+    role: Follow-up Manager
+    goal: >
+      Determine if a follow-up is needed and schedule it appropriately.
+    backstory: >
+      You ensure nothing falls through the cracks. If a task requires
+      follow-up (e.g. check if meeting confirmed, report delivered),
+      you create a reminder.
+    llm: gpt-4o-mini
+    context_from: [Task Executor]
+    max_iter: 1
+
+tasks:
+  - name: classify_request
+    description: "Classify and analyze this request: {user_message}"
+    agent: Request Classifier
+    expected_output: Request type, urgency, and required action
+
+  - name: execute_task
+    description: Execute the operational task
+    agent: Task Executor
+    expected_output: Confirmation of action taken and any relevant output
+
+  - name: schedule_followup
+    description: Determine and schedule any required follow-up
+    agent: Follow-up Scheduler
+    expected_output: Follow-up plan or confirmation that none needed
